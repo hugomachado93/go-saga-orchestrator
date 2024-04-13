@@ -1,0 +1,10 @@
+{
+    "name": "statemachinename",
+    "workflow": [
+        {
+            "state": "statehere",
+            "event": "eventhere",
+            "next-step": "nextstephere"
+        }
+    ]
+}
