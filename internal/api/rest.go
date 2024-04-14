@@ -40,5 +40,10 @@ func (a *api) createNewStateMachine(w http.ResponseWriter, r *http.Request) {
 	var stm *requests.Statemachine
 	xapk := r.Header.Get("x-api-key")
 	json.NewDecoder(r.Body).Decode(&stm)
-	a.s.InsertStateMachineSettings(stm, xapk)
+	err := a.s.InsertStateMachineSettings(stm.ToStateMachineSeetings(), xapk)
+
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+	}
+	w.WriteHeader(http.StatusOK)
 }

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"main/internal/domain/saga"
-	"main/internal/err"
 	kafka_adapter "main/internal/kafka"
 	"main/internal/repository"
 
@@ -83,7 +82,7 @@ func getApiKey(msg kafka.Message) (string, error) {
 		}
 	}
 
-	return "", err.ErroFailedFindApiKey
+	return "", fmt.Errorf("failed to find api-key")
 }
 
 func (o *OrchestratorService) SendCommand() {
@@ -98,7 +97,7 @@ func (o *OrchestratorService) SendCommand() {
 				saga.RequestSaga()
 				o.sagaRepo.UpdateSaga(ctx, &saga)
 			} else {
-				fmt.Errorf("failed to send message %w", err)
+				return fmt.Errorf("failed to send message %w", err)
 			}
 		}
 

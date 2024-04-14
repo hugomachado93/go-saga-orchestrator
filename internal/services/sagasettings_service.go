@@ -2,7 +2,7 @@ package services
 
 import (
 	"context"
-	"main/internal/api/requests"
+	"main/internal/domain/statemachine"
 	"main/internal/repository"
 )
 
@@ -15,10 +15,13 @@ func NewStateMachine(cr *repository.StateMachineRepository, t *repository.Transa
 	return &SagaSettingsService{cr: cr, t: t}
 }
 
-func (c *SagaSettingsService) InsertStateMachineSettings(stm *requests.Statemachine, xApiKey string) {
-	c.t.WithTransaction(context.Background(), func(ctx context.Context) error {
-
-		c.cr.InsertSettings(ctx, stm, xApiKey)
+func (c *SagaSettingsService) InsertStateMachineSettings(sm *statemachine.Statemachine, xApiKey string) error {
+	return c.t.WithTransaction(context.Background(), func(ctx context.Context) error {
+		stm, err := statemachine.NewDefinition(xApiKey, sm)
+		if err != nil {
+			return err
+		}
+		c.cr.InsertSettings(ctx, stm)
 		return nil
 	})
 }

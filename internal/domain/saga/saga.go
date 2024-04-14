@@ -1,74 +1,67 @@
 package saga
 
-type nextRollback interface {
-	NextRollback(step Command) and
-	And() nextStep
-	Build()
+import (
+	"time"
+)
+
+type SagaStatus string
+
+type ResponseStatus string
+
+type Response struct {
+	SagaName string `json:"name"`
+	SagaUUID string `json:"uuid"`
+	Payload  string `json:"payload"`
+	Event    string `json:"event"`
 }
 
-type nextStep interface {
-	NextStep(step Command) nextRollback
+type Status string
+
+const (
+	WAITING_PROCESS   Status = "WAITING_PROCESS"
+	REQUEST_SENT      Status = "REQUEST_SENT"
+	RESPONSE_RECEIVED Status = "RESPONSE_RECEIVED"
+)
+
+type Saga struct {
+	Id           int64
+	ApiKey       string
+	SagaName     string
+	SagaUUID     string
+	Payload      string
+	CurrentState string
+	Status       Status
+	Timeout      *time.Time
+	CreatedAt    time.Time
+	LastUpdate   time.Time
 }
 
-type and interface {
-	And() nextStep
-	Build()
+func NewSaga(apiKey string, uuid string, name string) *Saga {
+	return &Saga{ApiKey: apiKey, SagaUUID: uuid, SagaName: name, CreatedAt: time.Now()}
 }
 
-var sagaMap map[string]SagaList = make(map[string]SagaList)
-
-type SagaList [][]Command
-
-type SagaBuilder struct {
-	sagaName     string
-	nextStep     Command
-	rollbackStep Command
-	saga         SagaList
+func (s *Saga) UpdateSaga(payload string, nextState string) {
+	s.CurrentState = nextState
+	s.Payload = payload
+	s.Status = WAITING_PROCESS
+	s.LastUpdate = time.Now()
 }
 
-func NewSagaDefinition(sagaName string) nextStep {
-	s := &SagaBuilder{sagaName: sagaName, saga: make([][]Command, 0)}
-	return s
+func (s *Saga) RequestSaga() {
+	s.Status = REQUEST_SENT
+	s.LastUpdate = time.Now()
+	t := time.Now().Add(time.Duration(time.Duration.Seconds(120)))
+	s.Timeout = &t
 }
 
-func (s *SagaBuilder) NextStep(step Command) nextRollback {
-	s.nextStep = step
-	return s
-}
-
-func (s *SagaBuilder) NextRollback(step Command) and {
-	s.rollbackStep = step
-	return s
-}
-
-func (s *SagaBuilder) And() nextStep {
-	s.insert()
-	return s
-}
-
-func (s *SagaBuilder) Build() {
-	s.insert()
-	sagaMap[s.sagaName] = s.saga
-}
-
-func (s *SagaBuilder) insert() {
-	arr := make([]Command, 0)
-	arr = append(arr, s.nextStep)
-	arr = append(arr, s.rollbackStep)
-	s.saga = append(s.saga, arr)
-}
-
-func GetNextCommanfWithIndex(sagaName string, idx int, isRollback bool) Command {
-	size := len(sagaMap[sagaName])
-	if idx >= size || idx < 0 {
-		return ""
+func (s *Saga) ReceiveResponse() {
+	if s.Status == REQUEST_SENT {
+		s.Status = RESPONSE_RECEIVED
 	}
-	return sagaMap[sagaName][idx][getIdy(isRollback)]
 }
 
-func getIdy(isRollback bool) int {
-	if isRollback {
-		return 1
-	}
-	return 0
+func (s *Saga) HasSagaTimedout() bool {
+	tn := time.Now()
+	v := s.Timeout.Compare(tn)
+	return v == -1
 }
