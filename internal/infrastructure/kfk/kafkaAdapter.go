@@ -1,4 +1,4 @@
-package kafka_adapter
+package kfk
 
 import (
 	"context"

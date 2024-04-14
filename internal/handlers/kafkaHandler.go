@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	kafka_adapter "main/internal/kafka"
+	"main/internal/infrastructure/kfk"
 	"main/internal/services"
 )
 
@@ -15,6 +15,6 @@ func NewKafkaListeners(os *services.OrchestratorService, ps *services.PaymentSer
 }
 
 func (kl *KafkaListeners) HandleKafkaListeners() {
-	kafka_adapter.ListenKafkaHanlderFunc("APP_ORCHESTRATOR", "orquestrator", 0, kl.orchestratorService.OrchestrateSaga)
-	kafka_adapter.ListenKafkaHanlderFunc("AUTHORIZE_PAYMENT", "commands", 0, kl.paymentService.AuthorizePayment)
+	kfk.ListenKafkaHanlderFunc("APP_ORCHESTRATOR", "orquestrator", 0, kl.orchestratorService.OrchestrateSaga)
+	kfk.ListenKafkaHanlderFunc("AUTHORIZE_PAYMENT", "commands", 0, kl.paymentService.AuthorizePayment)
 }

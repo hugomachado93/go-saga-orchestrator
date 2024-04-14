@@ -19,7 +19,7 @@ func (sr *StateMachineRepository) InsertSettings(ctx context.Context, stm statem
 	tx := extractTx(ctx)
 
 	sql := "INSERT INTO statemachine_settings (client_api_key, name, context, created_at) VALUES ($1, $2, $3, $4)"
-	_, err := tx.Exec(sql, stm.GetName(), stm.GetName(), stm.ContextToJson(), time.Now())
+	_, err := tx.Exec(sql, stm.XApiKey(), stm.GetName(), stm.ContextToJson(), time.Now())
 	if err != nil {
 		fmt.Println(err)
 		return err

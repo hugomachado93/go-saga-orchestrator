@@ -21,28 +21,12 @@ type StatemachineDefinition struct {
 	CreatedAt    time.Time
 }
 
-func NewDefinition(ClientApiKey string, context *Statemachine) (IStatemachineDefintion, error) {
+func NewDefinition(clientApiKey string, context *Statemachine) (IStatemachineDefintion, error) {
 	err := validateDefinition(context)
 	if err != nil {
 		return nil, err
 	}
-	return &StatemachineDefinition{ClientApiKey: ClientApiKey, Context: context}, nil
-}
-
-func validateDefinition(context *Statemachine) error {
-	for _, v := range context.Workflow {
-		nextState := v.NextState
-		hasState := false
-		for _, v := range context.Workflow {
-			if v.State == nextState {
-				continue
-			}
-		}
-		if !v.End && !hasState {
-			return fmt.Errorf("the definition is wrong. there is no state for NextState %s", nextState)
-		}
-	}
-	return nil
+	return &StatemachineDefinition{ClientApiKey: clientApiKey, Name: context.Name, Context: context}, nil
 }
 
 func (stm *StatemachineDefinition) FindNextStep(state string, event string) (string, error) {

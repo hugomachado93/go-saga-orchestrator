@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"main/internal/domain/saga"
-	kafka_adapter "main/internal/kafka"
+	"main/internal/infrastructure/kfk"
 	"main/internal/repository"
 
 	"github.com/google/uuid"
@@ -93,7 +93,7 @@ func (o *OrchestratorService) SendCommand() {
 		}
 
 		for _, saga := range sagas {
-			if err := kafka_adapter.SendMessage(saga.Payload, saga.CurrentState, nil, saga.SagaUUID); err == nil {
+			if err := kfk.SendMessage(saga.Payload, saga.CurrentState, nil, saga.SagaUUID); err == nil {
 				saga.RequestSaga()
 				o.sagaRepo.UpdateSaga(ctx, &saga)
 			} else {
@@ -117,7 +117,7 @@ func (o *OrchestratorService) CheckTimeout() {
 				continue
 			}
 
-			if err := kafka_adapter.SendMessage(saga.Payload, saga.CurrentState, nil, saga.SagaUUID); err == nil {
+			if err := kfk.SendMessage(saga.Payload, saga.CurrentState, nil, saga.SagaUUID); err == nil {
 				saga.RequestSaga()
 				o.sagaRepo.UpdateSaga(ctx, &saga)
 			} else {

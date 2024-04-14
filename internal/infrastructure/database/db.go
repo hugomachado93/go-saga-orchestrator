@@ -1,4 +1,4 @@
-package transac
+package db
 
 import (
 	"database/sql"
