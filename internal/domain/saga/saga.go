@@ -40,11 +40,12 @@ func NewSaga(apiKey string, uuid string, name string) *Saga {
 	return &Saga{ApiKey: apiKey, SagaUUID: uuid, SagaName: name, CreatedAt: time.Now()}
 }
 
-func (s *Saga) UpdateSaga(payload string, nextState string) {
+func (s *Saga) PrepareNextCommand(payload string, nextState string) {
 	s.CurrentState = nextState
 	s.Payload = payload
 	s.Status = WAITING_PROCESS
 	s.LastUpdate = time.Now()
+	s.CreatedAt = time.Now()
 }
 
 func (s *Saga) RequestSaga() {

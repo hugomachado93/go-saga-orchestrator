@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"main/internal/api/middlewares"
@@ -22,34 +23,21 @@ type api struct {
 func CreateRoutes(r *mux.Router, s *services.SagaSettingsService, am *middlewares.AuthMiddleware) {
 	ap := &api{s: s, am: am}
 
-	// r.HandleFunc("/teste2", statemachine.DrawGraph)
-	r.HandleFunc("/show", func(w http.ResponseWriter, r *http.Request) {
-		var stm *requests.Statemachine
-		json.NewDecoder(r.Body).Decode(&stm)
-		gsvg, err := stm.ToStateMachineSeetings().DrawGraph()
+	smr := r.PathPrefix("/v1/statemachine").Subrouter()
+	smr.HandleFunc("/check", ap.checkStateMachine).Methods(http.MethodGet)
 
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
+	smrs := smr.NewRoute().Subrouter()
+	smrs.Use(am.AuthMiddleware)
+	smrs.HandleFunc("/create", ap.createNewStateMachine).Methods(http.MethodPost)
 
-		w.Header().Set("content-type", "image/svg+xml")
-		w.WriteHeader(200)
-		w.Write(gsvg)
-	}).Methods("POST")
-
-	testesubr := r.PathPrefix("/v1/statemachine").Subrouter()
-	testesubr.Use(am.AuthMiddleware)
-	testesubr.HandleFunc("/create", ap.createNewStateMachine).Methods(http.MethodPost)
-
-	testesubr.HandleFunc("/teste", func(w http.ResponseWriter, r *http.Request) {
+	smrs.HandleFunc("/teste", func(w http.ResponseWriter, r *http.Request) {
 
 		h := protocol.Header{Key: "x-api-key", Value: []byte("644e032b-3ee0-441e-a10c-d265a986ca2c")}
 
 		headers := make([]protocol.Header, 0)
 		headers = append(headers, h)
 
-		rjson, _ := json.Marshal(saga.Response{SagaName: "teste", Payload: "", Event: "start"})
+		rjson, _ := json.Marshal(saga.Response{SagaName: "PAYMENT", Payload: "payload1", Event: "STARTED"})
 		kfk.SendMessage(string(rjson), "APP_ORCHESTRATOR", headers, "")
 	}).Methods(http.MethodPost)
 }
@@ -66,4 +54,27 @@ func (a *api) createNewStateMachine(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func (a *api) checkStateMachine(w http.ResponseWriter, r *http.Request) {
+	var stm *requests.Statemachine
+	defBase64 := r.URL.Query().Get("definition")
+
+	if defBase64 != "" {
+		defJson, _ := base64.StdEncoding.DecodeString(defBase64)
+		fmt.Println(string(defJson))
+		json.Unmarshal(defJson, &stm)
+	} else {
+		json.NewDecoder(r.Body).Decode(&stm)
+	}
+	gsvg, err := stm.ToStateMachineSeetings().DrawGraph()
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("content-type", "image/svg+xml")
+	w.WriteHeader(200)
+	w.Write(gsvg)
 }

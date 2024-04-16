@@ -80,7 +80,7 @@ func (sm *Statemachine) DrawGraph() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		n1.SetFillColor("green")
+		n1.SetFillColor("aquamarine")
 		n1.SetStyle(cgraph.FilledNodeStyle)
 		n2, err := graph.CreateNode(nState)
 		if err != nil {
@@ -88,9 +88,9 @@ func (sm *Statemachine) DrawGraph() ([]byte, error) {
 		}
 
 		if v.End {
-			n2.SetFillColor("blue")
+			n2.SetFillColor("lightblue")
 		} else {
-			n2.SetFillColor("green")
+			n2.SetFillColor("aquamarine")
 		}
 		n2.SetStyle(cgraph.FilledNodeStyle)
 		e, err := graph.CreateEdge(v.Event, n1, n2)

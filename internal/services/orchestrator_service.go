@@ -33,7 +33,7 @@ func (o *OrchestratorService) OrchestrateSaga(msg kafka.Message) error {
 
 		apkey, err := getApiKey(msg)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get apikey %w", err)
 		}
 
 		json.Unmarshal(msg.Value, &response)
@@ -65,7 +65,12 @@ func (o *OrchestratorService) OrchestrateSaga(msg kafka.Message) error {
 			return err
 		}
 
-		s.UpdateSaga(response.Payload, nextState)
+		if nextState == "" {
+			//This the final state and the saga must end
+			return nil
+		}
+
+		s.PrepareNextCommand(response.Payload, nextState)
 
 		if err := o.sagaRepo.InsertSaga(ctx, s); err != nil {
 			return err
@@ -92,10 +97,12 @@ func (o *OrchestratorService) SendCommand() {
 			return err
 		}
 
-		for _, saga := range sagas {
-			if err := kfk.SendMessage(saga.Payload, saga.CurrentState, nil, saga.SagaUUID); err == nil {
-				saga.RequestSaga()
-				o.sagaRepo.UpdateSaga(ctx, &saga)
+		for _, s := range sagas {
+			sr := saga.Response{SagaName: s.SagaName, SagaUUID: s.SagaUUID, Payload: s.Payload, Event: s.CurrentState}
+			srs, _ := json.Marshal(sr)
+			if err := kfk.SendMessage(string(srs), s.CurrentState, nil, s.SagaUUID); err == nil {
+				s.RequestSaga()
+				o.sagaRepo.UpdateSaga(ctx, &s)
 			} else {
 				return fmt.Errorf("failed to send message %w", err)
 			}
@@ -112,14 +119,15 @@ func (o *OrchestratorService) CheckTimeout() {
 			return err
 		}
 
-		for _, saga := range sagas {
-			if !saga.HasSagaTimedout() {
+		for _, s := range sagas {
+			if !s.HasSagaTimedout() {
 				continue
 			}
-
-			if err := kfk.SendMessage(saga.Payload, saga.CurrentState, nil, saga.SagaUUID); err == nil {
-				saga.RequestSaga()
-				o.sagaRepo.UpdateSaga(ctx, &saga)
+			sr := saga.Response{SagaName: s.SagaName, SagaUUID: s.SagaUUID, Payload: s.Payload, Event: s.CurrentState}
+			srs, _ := json.Marshal(sr)
+			if err := kfk.SendMessage(string(srs), s.CurrentState, nil, s.SagaUUID); err == nil {
+				s.RequestSaga()
+				o.sagaRepo.UpdateSaga(ctx, &s)
 			} else {
 				fmt.Println("failed to send message %w", err)
 			}

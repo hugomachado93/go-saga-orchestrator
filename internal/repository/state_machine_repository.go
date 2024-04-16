@@ -33,15 +33,19 @@ func (sr *StateMachineRepository) FindSettingsByName(ctx context.Context, name s
 
 	var stm statemachine.StatemachineDefinition
 	var context string
+	var teste string
 
-	sql := "select * from statemachine_settings where name = $1"
+	sql := "SELECT id, client_api_key, name, context, created_at from statemachine_settings WHERE name = $1 limit 1"
 
 	r := tx.QueryRow(sql, name)
-	if r.Err() != nil {
-		return nil, fmt.Errorf("error here: %w", r.Err())
+	if err := r.Err(); err != nil {
+		return nil, fmt.Errorf("failed %w", err)
 	}
 
-	r.Scan(&stm.Id, &stm.ClientApiKey, &stm.Name, &context, stm.CreatedAt)
+	err := r.Scan(&stm.Id, &teste, &stm.Name, &context, &stm.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed %w", err)
+	}
 
 	json.Unmarshal([]byte(context), &stm.Context)
 

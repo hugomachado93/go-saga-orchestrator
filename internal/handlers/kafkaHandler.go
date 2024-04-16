@@ -17,4 +17,5 @@ func NewKafkaListeners(os *services.OrchestratorService, ps *services.PaymentSer
 func (kl *KafkaListeners) HandleKafkaListeners() {
 	kfk.ListenKafkaHanlderFunc("APP_ORCHESTRATOR", "orquestrator", 0, kl.orchestratorService.OrchestrateSaga)
 	kfk.ListenKafkaHanlderFunc("AUTHORIZE_PAYMENT", "commands", 0, kl.paymentService.AuthorizePayment)
+	kfk.ListenKafkaHanlderFunc("CAPTURE_PAYMENT", "commands", 0, kl.paymentService.CapturePayment)
 }
