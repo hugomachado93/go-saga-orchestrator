@@ -7,7 +7,7 @@ import (
 )
 
 type IStatemachineDefintion interface {
-	FindNextStep(state string, event string) (string, error)
+	FindNextStep(state string, event string) (string, *int, error)
 	GetName() string
 	XApiKey() string
 	ContextToJson() string
@@ -29,22 +29,22 @@ func NewDefinition(clientApiKey string, context *Statemachine) (IStatemachineDef
 	return &StatemachineDefinition{ClientApiKey: clientApiKey, Name: context.Name, Context: context}, nil
 }
 
-func (stm *StatemachineDefinition) FindNextStep(state string, event string) (string, error) {
+func (stm *StatemachineDefinition) FindNextStep(state string, event string) (string, *int, error) {
 	if state == "" {
-		return stm.Context.Workflow[0].NextState, nil
+		return stm.Context.Workflow[0].NextState, nil, nil
 	}
 
 	for _, v := range stm.Context.Workflow {
 
 		if v.State == state && v.End {
-			return "", nil
+			return "", nil, nil
 		}
 
 		if v.State == state && v.Event == event {
-			return v.NextState, nil
+			return v.NextState, v.Delay, nil
 		}
 	}
-	return "", fmt.Errorf("state or event not found")
+	return "", nil, fmt.Errorf("state or event not found")
 }
 
 func (stm *StatemachineDefinition) GetName() string {

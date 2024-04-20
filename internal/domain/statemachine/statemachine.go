@@ -12,6 +12,7 @@ type Stmc struct {
 	State     string `json:"state"`
 	Event     string `json:"event"`
 	NextState string `json:"nextState"`
+	Delay     *int   `json:"delay"`
 	End       bool   `json:"end"`
 }
 

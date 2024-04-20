@@ -60,17 +60,17 @@ func (o *OrchestratorService) OrchestrateSaga(msg kafka.Message) error {
 		}
 
 		fmt.Println("Preparing saga")
-		nextState, err := stm.FindNextStep(s.CurrentState, response.Event)
+		nextState, delay, err := stm.FindNextStep(s.CurrentState, response.Event)
 		if err != nil {
 			return err
 		}
 
 		if nextState == "" {
-			//This the final state and the saga must end
+			//If nextState is empty than this the final state and the saga must end
 			return nil
 		}
 
-		s.PrepareNextCommand(response.Payload, nextState)
+		s.PrepareNextCommand(response.Payload, nextState, delay)
 
 		if err := o.sagaRepo.InsertSaga(ctx, s); err != nil {
 			return err

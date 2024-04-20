@@ -24,28 +24,35 @@ const (
 )
 
 type Saga struct {
-	Id           int64
-	ApiKey       string
-	SagaName     string
-	SagaUUID     string
-	Payload      string
-	CurrentState string
-	Status       Status
-	Timeout      *time.Time
-	CreatedAt    time.Time
-	LastUpdate   time.Time
+	Id             int64
+	ApiKey         string
+	SagaName       string
+	SagaUUID       string
+	Payload        string
+	CurrentState   string
+	Status         Status
+	Timeout        *time.Time
+	CreatedAt      time.Time
+	DelayedMessage *time.Time
+	LastUpdate     time.Time
 }
 
 func NewSaga(apiKey string, uuid string, name string) *Saga {
 	return &Saga{ApiKey: apiKey, SagaUUID: uuid, SagaName: name, CreatedAt: time.Now()}
 }
 
-func (s *Saga) PrepareNextCommand(payload string, nextState string) {
+func (s *Saga) PrepareNextCommand(payload string, nextState string, delay *int) {
 	s.CurrentState = nextState
 	s.Payload = payload
 	s.Status = WAITING_PROCESS
 	s.LastUpdate = time.Now()
 	s.CreatedAt = time.Now()
+
+	if delay != nil {
+		t := time.Now().Add(time.Second * time.Duration(*delay))
+		s.DelayedMessage = &t
+	}
+
 }
 
 func (s *Saga) RequestSaga() {

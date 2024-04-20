@@ -10,6 +10,8 @@
             "request": "launch",
             "mode": "auto",
             "program": "cmd/main.go",
+            "env": {},
+			"args": []
         }
     ]
 }
