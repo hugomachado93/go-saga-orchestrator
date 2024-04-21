@@ -31,7 +31,7 @@ func NewDefinition(clientApiKey string, context *Statemachine) (IStatemachineDef
 
 func (stm *StatemachineDefinition) FindNextStep(state string, event string) (string, *int, error) {
 	if state == "" {
-		return stm.Context.Workflow[0].NextState, nil, nil
+		return stm.Context.Workflow[0].NextState, stm.Context.Workflow[0].Delay, nil
 	}
 
 	for _, v := range stm.Context.Workflow {

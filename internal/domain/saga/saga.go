@@ -24,17 +24,17 @@ const (
 )
 
 type Saga struct {
-	Id             int64
-	ApiKey         string
-	SagaName       string
-	SagaUUID       string
-	Payload        string
-	CurrentState   string
-	Status         Status
-	Timeout        *time.Time
-	CreatedAt      time.Time
-	DelayedMessage *time.Time
-	LastUpdate     time.Time
+	Id             int64      `db:"id"`
+	ApiKey         string     `db:"api_key"`
+	SagaName       string     `db:name`
+	SagaUUID       string     `db:"uuid"`
+	Payload        string     `db:"payload"`
+	CurrentState   string     `db:"state"`
+	Status         Status     `db:"status"`
+	Timeout        *time.Time `db:"timeout"`
+	CreatedAt      time.Time  `db:"created_at"`
+	DelayedMessage *time.Time `db:"delayed_message"`
+	LastUpdate     time.Time  `db:"last_update"`
 }
 
 func NewSaga(apiKey string, uuid string, name string) *Saga {
