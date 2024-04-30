@@ -17,8 +17,8 @@ func NewJobsHandler(o *services.OrchestratorService) *JobsHandler {
 func (j *JobsHandler) HandleJobs() {
 	c := cron.New()
 
-	c.AddFunc("@every 10s", j.o.SendCommand)
-	c.AddFunc("@every 1m", j.o.CheckTimeout)
+	// c.AddFunc("@every 10s", j.o.SendCommand)
+	// c.AddFunc("@every 1m", j.o.CheckTimeout)
 
 	c.Start()
 }

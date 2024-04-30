@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"main/internal/domain/saga"
-	"main/internal/infrastructure/kfk"
 	"main/internal/repository"
 
 	"github.com/google/uuid"
@@ -29,6 +28,7 @@ func (o *OrchestratorService) OrchestrateSaga(msg kafka.Message) error {
 	ctx := context.Background()
 
 	return o.transaction.WithTransaction(ctx, func(ctx context.Context) error {
+		fmt.Println("Preparing saga")
 		var response saga.Response
 
 		apkey, err := getApiKey(msg)
@@ -38,7 +38,7 @@ func (o *OrchestratorService) OrchestrateSaga(msg kafka.Message) error {
 
 		json.Unmarshal(msg.Value, &response)
 
-		s, err := o.sagaRepo.FindSagaByUUID(ctx, response.SagaUUID)
+		s, err := o.sagaRepo.GetSagaByUUID(ctx, response.SagaUUID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				s = saga.NewSaga(apkey, uuid.New().String(), response.SagaName)
@@ -50,29 +50,24 @@ func (o *OrchestratorService) OrchestrateSaga(msg kafka.Message) error {
 
 		s.ReceiveResponse()
 
-		if err := o.sagaRepo.UpdateSaga(ctx, s); err != nil {
-			return fmt.Errorf("failed to update saga %w", err)
-		}
-
 		stm, err := o.stmRepo.FindSettingsByName(ctx, response.SagaName)
 		if err != nil {
 			return err
 		}
 
-		fmt.Println("Preparing saga")
-		nextState, delay, err := stm.FindNextStep(s.CurrentState, response.Event)
+		nextState, delay, err := stm.FindNextStep(s.State, response.Event)
 		if err != nil {
 			return err
 		}
 
 		if nextState == "" {
 			//If nextState is empty than this the final state and the saga must end
-			return nil
+			s.FinishSaga()
+		} else {
+			s.PrepareNextCommand(response.Payload, nextState, delay)
 		}
 
-		s.PrepareNextCommand(response.Payload, nextState, delay)
-
-		if err := o.sagaRepo.InsertSaga(ctx, s); err != nil {
+		if err := o.sagaRepo.SaveSaga(ctx, s); err != nil {
 			return err
 		}
 
@@ -90,49 +85,49 @@ func getApiKey(msg kafka.Message) (string, error) {
 	return "", fmt.Errorf("failed to find api-key")
 }
 
-func (o *OrchestratorService) SendCommand() {
-	o.transaction.WithTransaction(context.Background(), func(ctx context.Context) error {
-		sagas, err := o.sagaRepo.FindSagasByStatus(ctx, saga.WAITING_PROCESS)
-		if err != nil {
-			return err
-		}
+// func (o *OrchestratorService) SendCommand() {
+// 	o.transaction.WithTransaction(context.Background(), func(ctx context.Context) error {
+// 		sagas, err := o.sagaRepo.FindAllSagaCommandsByStatus(ctx, saga.WAITING_PROCESS)
+// 		if err != nil {
+// 			return err
+// 		}
 
-		for _, s := range sagas {
-			sr := saga.Response{SagaName: s.SagaName, SagaUUID: s.SagaUUID, Payload: s.Payload, Event: s.CurrentState}
-			srs, _ := json.Marshal(sr)
-			if err := kfk.SendMessage(string(srs), s.CurrentState, nil, s.SagaUUID); err == nil {
-				s.RequestSaga()
-				o.sagaRepo.UpdateSaga(ctx, &s)
-			} else {
-				return fmt.Errorf("failed to send message %w", err)
-			}
-		}
+// 		for _, s := range sagas {
+// 			sr := saga.Response{SagaName: s.SagaName, SagaUUID: s.SagaUUID, Payload: s.Payload, Event: s.CurrentState}
+// 			srs, _ := json.Marshal(sr)
+// 			if err := kfk.SendMessage(string(srs), s.CurrentState, nil, s.SagaUUID); err == nil {
+// 				s.RequestSaga()
+// 				o.sagaRepo.UpdateSaga(ctx, &s)
+// 			} else {
+// 				return fmt.Errorf("failed to send message %w", err)
+// 			}
+// 		}
 
-		return nil
-	})
-}
+// 		return nil
+// 	})
+// }
 
-func (o *OrchestratorService) CheckTimeout() {
-	o.transaction.WithTransaction(context.Background(), func(ctx context.Context) error {
-		sagas, err := o.sagaRepo.FindSagasByStatus(ctx, saga.REQUEST_SENT)
-		if err != nil {
-			return err
-		}
+// func (o *OrchestratorService) CheckTimeout() {
+// 	o.transaction.WithTransaction(context.Background(), func(ctx context.Context) error {
+// 		sagas, err := o.sagaRepo.FindSagasByStatus(ctx, saga.REQUEST_SENT)
+// 		if err != nil {
+// 			return err
+// 		}
 
-		for _, s := range sagas {
-			if !s.HasSagaTimedout() {
-				continue
-			}
-			sr := saga.Response{SagaName: s.SagaName, SagaUUID: s.SagaUUID, Payload: s.Payload, Event: s.CurrentState}
-			srs, _ := json.Marshal(sr)
-			if err := kfk.SendMessage(string(srs), s.CurrentState, nil, s.SagaUUID); err == nil {
-				s.RequestSaga()
-				o.sagaRepo.UpdateSaga(ctx, &s)
-			} else {
-				fmt.Println("failed to send message %w", err)
-			}
-		}
+// 		for _, s := range sagas {
+// 			if !s.HasSagaTimedout() {
+// 				continue
+// 			}
+// 			sr := saga.Response{SagaName: s.SagaName, SagaUUID: s.SagaUUID, Payload: s.Payload, Event: s.CurrentState}
+// 			srs, _ := json.Marshal(sr)
+// 			if err := kfk.SendMessage(string(srs), s.CurrentState, nil, s.SagaUUID); err == nil {
+// 				s.RequestSaga()
+// 				o.sagaRepo.UpdateSaga(ctx, &s)
+// 			} else {
+// 				fmt.Println("failed to send message %w", err)
+// 			}
+// 		}
 
-		return nil
-	})
-}
+// 		return nil
+// 	})
+// }

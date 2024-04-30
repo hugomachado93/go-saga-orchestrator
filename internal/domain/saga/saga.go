@@ -15,61 +15,53 @@ type Response struct {
 	Event    string `json:"event"`
 }
 
-type Status string
-
-const (
-	WAITING_PROCESS   Status = "WAITING_PROCESS"
-	REQUEST_SENT      Status = "REQUEST_SENT"
-	RESPONSE_RECEIVED Status = "RESPONSE_RECEIVED"
-)
-
 type Saga struct {
-	Id             int64      `db:"id"`
-	ApiKey         string     `db:"api_key"`
-	SagaName       string     `db:name`
-	SagaUUID       string     `db:"uuid"`
-	Payload        string     `db:"payload"`
-	CurrentState   string     `db:"state"`
-	Status         Status     `db:"status"`
-	Timeout        *time.Time `db:"timeout"`
-	CreatedAt      time.Time  `db:"created_at"`
-	DelayedMessage *time.Time `db:"delayed_message"`
-	LastUpdate     time.Time  `db:"last_update"`
+	Id           *int64    `db:"id"`
+	ApiKey       string    `db:"api_key"`
+	UUID         string    `db:"uuid"`
+	Name         string    `db:"name"`
+	State        string    `db:"state"`
+	Status       string    `db:"status"`
+	CreatedAt    time.Time `db:"created_at"`
+	LastUpdate   time.Time `db:"last_update"`
+	SagaCommands []SagaCommand
 }
 
 func NewSaga(apiKey string, uuid string, name string) *Saga {
-	return &Saga{ApiKey: apiKey, SagaUUID: uuid, SagaName: name, CreatedAt: time.Now()}
+	s := &Saga{ApiKey: apiKey, Name: name, UUID: uuid, SagaCommands: make([]SagaCommand, 0)}
+	return s
 }
 
 func (s *Saga) PrepareNextCommand(payload string, nextState string, delay *int) {
-	s.CurrentState = nextState
-	s.Payload = payload
-	s.Status = WAITING_PROCESS
+
+	s.LastUpdate = time.Now()
+	s.State = nextState
+	s.Status = "EXECUTING"
+	s.SagaCommands = append(s.SagaCommands, NewCommand(s.State, s.Id, nil))
 	s.LastUpdate = time.Now()
 	s.CreatedAt = time.Now()
-
-	if delay != nil {
-		t := time.Now().Add(time.Second * time.Duration(*delay))
-		s.DelayedMessage = &t
-	}
-
 }
 
-func (s *Saga) RequestSaga() {
-	s.Status = REQUEST_SENT
+func (s *Saga) FinishSaga() {
+	s.Status = "COMPLETED"
 	s.LastUpdate = time.Now()
-	t := time.Now().Add(time.Duration(time.Duration.Seconds(120)))
-	s.Timeout = &t
+}
+
+func (s *Saga) RequestCommand() {
+	if len(s.SagaCommands) > 0 {
+		s.SagaCommands[len(s.SagaCommands)-1].RequestCommand()
+	}
 }
 
 func (s *Saga) ReceiveResponse() {
-	if s.Status == REQUEST_SENT {
-		s.Status = RESPONSE_RECEIVED
+	if len(s.SagaCommands) > 0 {
+		s.SagaCommands[len(s.SagaCommands)-1].ReceiveResponse()
 	}
 }
 
 func (s *Saga) HasSagaTimedout() bool {
-	tn := time.Now()
-	v := s.Timeout.Compare(tn)
-	return v == -1
+	if len(s.SagaCommands) > 0 {
+		return s.SagaCommands[len(s.SagaCommands)-1].HasCommandTimeout()
+	}
+	return false
 }

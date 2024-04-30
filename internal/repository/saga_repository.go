@@ -12,38 +12,50 @@ func NewSagaRepositor() *SagaRepository {
 	return &SagaRepository{}
 }
 
-func (sr *SagaRepository) InsertSaga(ctx context.Context, saga *saga.Saga) error {
+func (r *SagaRepository) SaveSaga(ctx context.Context, saga *saga.Saga) error {
 	tx := extractTx(ctx)
-	sql := "INSERT INTO saga_command (api_key, name, uuid, state, status, payload, timeout, created_at, last_update, delayed_message) VALUES (:api_key, :name, :uuid, :state, :status, :payload, :timeout, :created_at, :last_update, :delayed_message)"
-	_, err := tx.NamedExec(sql, saga)
-	if err != nil {
-		return err
+	if saga.Id != nil {
+		_, err := tx.NamedExec("UPDATE saga SET api_key = :api_key, uuid = :uuid, name = :name, state = :state, status = :status, last_update = :last_update WHERE id = id", saga)
+		if err != nil {
+			return err
+		}
+	} else {
+		res, err := tx.PrepareNamed("INSERT INTO saga (api_key, uuid, name, state, status, created_at, last_update) VALUES (:api_key, :uuid, :name, :state, :status, :created_at, :last_update) RETURNING id")
+		if err != nil {
+			return err
+		}
+		var id int64
+		err = res.Get(&id, saga)
+		if err != nil {
+			return err
+		}
+		saga.Id = &id
+	}
+
+	// Insert associated saga commands
+	for _, command := range saga.SagaCommands {
+		command.SagaId = saga.Id
+		_, err := tx.NamedExec("INSERT INTO saga_command (payload, state, status, timeout, created_at, last_update, saga_id) VALUES (:payload, :state, :status, :timeout, :created_at, :last_update, :saga_id)", command)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func (sr *SagaRepository) UpdateSaga(ctx context.Context, saga *saga.Saga) error {
+// GetSaga retrieves a saga record by ID.
+func (r *SagaRepository) GetSagaByUUID(ctx context.Context, uuid string) (*saga.Saga, error) {
 	tx := extractTx(ctx)
-	sql := "UPDATE saga_command SET api_key = :api_key, name = :name, uuid = :uuid, state = :state, status = :status, payload = :paylaod, timeout = :timeout, created_at = :created_at, last_update = :last_update, delayed_message = :delayed_message where id = :id"
-	_, err := tx.NamedExec(sql, saga)
-	if err != nil {
-		return err
-	}
-	return nil
-}
 
-func (sr *SagaRepository) FindSagaByUUID(ctx context.Context, UUID string) (*saga.Saga, error) {
-	tx := extractTx(ctx)
-	sql := "SELECT id, api_key, name, uuid, payload, state, status, timeout, created_at, last_update, delayed_message FROM saga_command WHERE uuid = ? order by created_at desc limit 1"
-	r := tx.QueryRowx(sql, UUID)
-	if err := r.Err(); err != nil {
+	var saga saga.Saga
+	err := tx.Get(&saga, "SELECT * FROM saga WHERE uuid = $1", uuid)
+	if err != nil {
 		return nil, err
 	}
 
-	var saga saga.Saga
-
-	err := r.StructScan(&saga)
+	// Retrieve associated saga commands
+	err = tx.Select(&saga.SagaCommands, "SELECT * FROM saga_command WHERE saga_id = $1", saga.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -51,24 +63,24 @@ func (sr *SagaRepository) FindSagaByUUID(ctx context.Context, UUID string) (*sag
 	return &saga, nil
 }
 
-func (sr *SagaRepository) FindSagasByStatus(ctx context.Context, status saga.Status) ([]saga.Saga, error) {
+// UpdateSaga updates a saga record in the database.
+func (r *SagaRepository) UpdateSaga(ctx context.Context, saga *saga.Saga) error {
 	tx := extractTx(ctx)
-	sql := "SELECT id, api_key, name, uuid, payload, state, status, timeout, created_at, last_update, delayed_message FROM saga_command WHERE status = ? and delayed_message is null  order by created_at desc limit 1"
-	r, err := tx.Queryx(sql, status)
+
+	// Update saga record
+	_, err := tx.Exec("UPDATE saga SET api_key = $1, uuid = $2, name = $3, state = $4, status = $5, last_update = $6 WHERE id = $7", saga.ApiKey, saga.UUID, saga.Name, saga.State, saga.Status, saga.LastUpdate, saga.Id)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	var sagas []saga.Saga
-
-	for r.Next() {
-		var saga saga.Saga
-		err := r.StructScan(&saga)
+	// Insert updated associated saga commands
+	for _, command := range saga.SagaCommands {
+		_, err := tx.Exec("UPDATE saga_command SET payload = $1, state = $2, status = $3, timeout = $4, created_at = $5, last_update = $6, saga_id = $7 where id = $8",
+			command.Payload, command.CurrentState, command.Status, command.Timeout, command.CreatedAt, command.LastUpdate, saga.Id, command.Id)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		sagas = append(sagas, saga)
 	}
 
-	return sagas, nil
+	return nil
 }
